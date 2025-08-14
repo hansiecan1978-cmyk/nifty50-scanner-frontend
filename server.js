@@ -14,6 +14,9 @@ const NIFTY_50 = [
   'KOTAKBANK.BSE', 'SBIN.BSE', 'ASIANPAINT.BSE', 'AXISBANK.BSE', 'BAJFINANCE.BSE'
 ];
 
+// In your Node.js backend
+app.use(cors()); // Install cors package first
+
 // Cache for storing stock data
 const stockDataCache = {
   data: [],
@@ -161,4 +164,5 @@ function generateFallbackData(symbol) {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+
 });
