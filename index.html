@@ -573,18 +573,7 @@
             }
         }
 
-// Function to fetch stock data
-    async function fetchStockData() {
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/stocks`);
-            if (!response.ok) throw new Error('Network response was not ok');
-            return await response.json();
-        } catch (error) {
-            console.error('Error fetching real-time data:', error);
-            return generateFallbackData();
-        }
-    }
-    
+   
     // Generate fallback data
     function generateFallbackData() {
         const symbols = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK', 
