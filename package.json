@@ -5,11 +5,6 @@
   "scripts": {
     "start": "node server.js"
   },
-  const express = require('express');
-const cors = require('cors'); // Install with: npm install cors
-
-const app = express();
-app.use(cors()); // Enable ALL CORS requests
   "dependencies": {
     "axios": "^1.7.2",
     "cors": "^2.8.5",
@@ -19,3 +14,4 @@ app.use(cors()); // Enable ALL CORS requests
   }
 
 }
+
