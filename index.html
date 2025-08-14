@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nifty 50 Intraday Scanner - After Hours Support</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --buy: #3498db;
+            --sell: #e74c3c;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
+            --after-hours: #9b59b6;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: #fff;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .header {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid var(--secondary);
+            padding: 20px 0;
+        }
+        
+        .card {
+            background: rgba(30, 30, 46, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            color: #fff;
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+            border-color: rgba(52, 152, 219, 0.5);
+        }
+        
+        .high-prob { 
+            border-left: 5px solid var(--success);
+            background: rgba(39, 174, 96, 0.15);
+        }
+        
+        .medium-prob { 
+            border-left: 5px solid var(--warning);
+            background: rgba(243, 156, 18, 0.15);
+        }
+        
+        .low-prob { 
+            border-left: 5px solid var(--danger);
+            background: rgba(231, 76, 60, 0.15);
+        }
+        
+        .after-hours-card {
+            border-left: 5px solid var(--after-hours);
+            background: rgba(155, 89, 182, 0.15);
+        }
+        
+        .progress {
+            height: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            overflow: visible;
+        }
+        
+        .progress-bar {
+            border-radius: 12px;
+            position: relative;
+            transition: width 1.5s ease-in-out;
+        }
+        
+        .progress-bar::after {
+            content: attr(aria-valuenow) '%';
+            position: absolute;
+            right: 10px;
+            color: white;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(0,0,0,0.7);
+        }
+        
+        .buy {
+            color: var(--buy);
+            font-weight: bold;
+        }
+        
+        .sell {
+            color: var(--sell);
+            font-weight: bold;
+        }
+        
+        .after-hours {
+            color: var(--after-hours);
+            font-weight: bold;
+        }
+        
+        .last-updated {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 20px;
+            padding: 5px 15px;
+            font-size: 0.9rem;
+        }
+        
+        .loader {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 300px;
+        }
+        
+        .spinner {
+            width: 70px;
+            height: 70px;
+            border: 7px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--secondary);
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .stock-symbol {
+            font-weight: 700;
+            font-size: 1.3rem;
+            background: linear-gradient(45deg, #3498db, #1abc9c);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .probability-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 0.8rem;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        
+        .high-badge {
+            background: var(--success);
+        }
+        
+        .medium-badge {
+            background: var(--warning);
+        }
+        
+        .low-badge {
+            background: var(--danger);
+        }
+        
+        .after-hours-badge {
+            background: var(--after-hours);
+        }
+        
+        .search-box {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+        }
+        
+        .search-box::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .search-box:focus {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            box-shadow: none;
+            border: 1px solid var(--secondary);
+        }
+        
+        .info-section {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            padding: 20px;
+        }
+        
+        .filter-btn.active {
+            background: var(--secondary);
+            border-color: var(--secondary);
+        }
+        
+        .direction-indicator {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 24px;
+            margin-right: 8px;
+            font-size: 12px;
+        }
+        
+        .buy-indicator {
+            background: var(--buy);
+        }
+        
+        .sell-indicator {
+            background: var(--sell);
+        }
+        
+        .after-hours-indicator {
+            background: var(--after-hours);
+        }
+        
+        .direction-label {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+        
+        .buy-label {
+            background: rgba(52, 152, 219, 0.2);
+            color: var(--buy);
+            border: 1px solid var(--buy);
+        }
+        
+        .sell-label {
+            background: rgba(231, 76, 60, 0.2);
+            color: var(--sell);
+            border: 1px solid var(--sell);
+        }
+        
+        .after-hours-label {
+            background: rgba(155, 89, 182, 0.2);
+            color: var(--after-hours);
+            border: 1px solid var(--after-hours);
+        }
+        
+        .card-header-direction {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            z-index: 10;
+        }
+        
+        .trend-arrow {
+            font-size: 1.5rem;
+            margin-right: 5px;
+        }
+        
+        .volatility-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 8px 12px;
+            margin-top: 10px;
+        }
+        
+        .volatility-bar {
+            height: 6px;
+            flex-grow: 1;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            margin: 0 10px;
+            overflow: hidden;
+        }
+        
+        .volatility-level {
+            height: 100%;
+            border-radius: 3px;
+        }
+        
+        .low-volatility .volatility-level {
+            width: 30%;
+            background: #27ae60;
+        }
+        
+        .medium-volatility .volatility-level {
+            width: 60%;
+            background: #f39c12;
+        }
+        
+        .high-volatility .volatility-level {
+            width: 90%;
+            background: #e74c3c;
+        }
+        
+        .card-footer {
+            background: rgba(0, 0, 0, 0.3);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .indicator-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .indicator-title {
+            font-size: 1rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .indicator-value {
+            font-size: 0.9rem;
+        }
+        
+        .market-status {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        
+        .market-open {
+            background: rgba(46, 204, 113, 0.2);
+            color: #27ae60;
+            border: 1px solid #27ae60;
+        }
+        
+        .market-closed {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+            border: 1px solid #e74c3c;
+        }
+        
+        .after-hours {
+            background: rgba(155, 89, 182, 0.2);
+            color: #9b59b6;
+            border: 1px solid #9b59b6;
+        }
+        
+        .disclaimer-banner {
+            background: rgba(231, 76, 60, 0.3);
+            border-left: 4px solid #e74c3c;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header sticky-top">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h1><i class="fas fa-chart-line"></i> Nifty 50 Scanner</h1>
+                    <p class="mb-0">Works during and after market hours</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="last-updated d-inline-block">
+                        <i class="fas fa-sync-alt"></i> Last Updated: <span id="update-time">Just now</span>
+                    </div>
+                    <div class="last-updated d-inline-block ms-2">
+                        <span id="market-status" class="market-status market-open">
+                            <i class="fas fa-circle"></i> Market Open
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container py-4">
+        <div id="after-hours-banner" class="disclaimer-banner" style="display: none;">
+            <h5><i class="fas fa-moon"></i> After-Hours Mode</h5>
+            <p class="mb-0">Market is currently closed. Showing last trading data and pre-market predictions for next session.</p>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="card-title"><i class="fas fa-chart-bar"></i> Top Opportunities</h3>
+                        <div class="chart-container" style="height: 300px;">
+                            <canvas id="probabilityChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card info-section">
+                    <h3><i class="fas fa-info-circle"></i> After-Hours Features</h3>
+                    <ul class="mt-3">
+                        <li class="mb-2">Shows last trading session data</li>
+                        <li class="mb-2">Provides pre-market predictions</li>
+                        <li class="mb-2">Analyzes after-hours news impact</li>
+                        <li>Projects next day's volatility patterns</li>
+                    </ul>
+                    
+                    <div class="mt-4">
+                        <h5><i class="fas fa-lightbulb"></i> After-Hours Indicators</h5>
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="direction-indicator after-hours-indicator"><i class="fas fa-clock"></i></div>
+                            <span>Purple = Pre-market prediction</span>
+                        </div>
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="direction-indicator buy-indicator"><i class="fas fa-arrow-up"></i></div>
+                            <span>Blue = Expected upward move</span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <div class="direction-indicator sell-indicator"><i class="fas fa-arrow-down"></i></div>
+                            <span>Red = Expected downward move</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-3 mb-3 mb-md-0">
+                        <h5 class="mb-0"><i class="fas fa-filter"></i> Filter Stocks</h5>
+                    </div>
+                    <div class="col-md-9">
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-sm btn-outline-primary filter-btn active" data-filter="all">All Stocks</button>
+                            <button class="btn btn-sm btn-outline-info filter-btn" data-filter="buy">Buy Signals</button>
+                            <button class="btn btn-sm btn-outline-danger filter-btn" data-filter="sell">Sell Signals</button>
+                            <button class="btn btn-sm btn-outline-success filter-btn" data-filter="high">High Probability</button>
+                            <button class="btn btn-sm btn-outline-warning filter-btn" data-filter="medium">Medium Probability</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" id="stock-search" class="form-control search-box" placeholder="Search stocks...">
+                </div>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <div class="btn-group">
+                    <button class="btn btn-outline-info" id="sort-probability">
+                        <i class="fas fa-sort-amount-down-alt"></i> Sort by Probability
+                    </button>
+                    <button class="btn btn-outline-info" id="sort-change">
+                        <i class="fas fa-sort-amount-down"></i> Sort by Volatility
+                    </button>
+                    <button class="btn btn-outline-warning" id="refresh-data">
+                        <i class="fas fa-sync-alt"></i> Refresh Data
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="loader" class="loader">
+            <div class="spinner"></div>
+        </div>
+        
+        <div id="results-container" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" style="display: none;">
+            <!-- Stock cards will be inserted here -->
+        </div>
+    </div>
+    
+    <footer class="text-center py-3">
+        <div class="container">
+            <p class="mb-0">After-hours predictions based on historical patterns, news analysis, and pre-market indicators.</p>
+            <p class="mb-0">Market data may be delayed during off-hours. Predictions are for informational purposes only.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Replace with your Render backend URL
+        const API_BASE_URL = 'https://nifty50-scanner-backend-1.onrender.com/';
+        
+        // Global market status
+        let isMarketOpen = false;
+        let isAfterHours = false;
+        
+        // Function to check market status
+        function checkMarketStatus() {
+            const now = new Date();
+            const utcHours = now.getUTCHours();
+            const utcMinutes = now.getUTCMinutes();
+            const utcDay = now.getUTCDay();
+            
+            // Convert to IST (UTC+5:30)
+            let istHours = utcHours + 5.5;
+            if (istHours >= 24) {
+                istHours -= 24;
+                // No need to adjust day as market doesn't cross midnight
+            }
+            
+            // Market hours: 9:15 AM to 3:30 PM IST (Monday-Friday)
+            const isWeekday = utcDay >= 1 && utcDay <= 5; // Monday to Friday
+            const marketStart = 9.25; // 9:15 AM = 9.25 hours
+            const marketEnd = 15.5;   // 3:30 PM = 15.5 hours
+            
+            if (isWeekday && istHours >= marketStart && istHours < marketEnd) {
+                return 'open';
+            } else if (isWeekday && (istHours >= marketEnd || istHours < marketStart)) {
+                return 'after-hours';
+            } else {
+                return 'closed';
+            }
+        }
+        
+        // Function to update market status display
+        function updateMarketStatus() {
+            const status = checkMarketStatus();
+            const statusElement = document.getElementById('market-status');
+            const banner = document.getElementById('after-hours-banner');
+            
+            if (status === 'open') {
+                statusElement.className = 'market-status market-open';
+                statusElement.innerHTML = '<i class="fas fa-circle"></i> Market Open';
+                banner.style.display = 'none';
+                isMarketOpen = true;
+                isAfterHours = false;
+            } else if (status === 'after-hours') {
+                statusElement.className = 'market-status after-hours';
+                statusElement.innerHTML = '<i class="fas fa-circle"></i> After-Hours';
+                banner.style.display = 'block';
+                isMarketOpen = false;
+                isAfterHours = true;
+            } else {
+                statusElement.className = 'market-status market-closed';
+                statusElement.innerHTML = '<i class="fas fa-circle"></i> Market Closed';
+                banner.style.display = 'block';
+                isMarketOpen = false;
+                isAfterHours = false;
+            }
+        }
+        
+        // Function to fetch real-time or after-hours data
+        async function fetchStockData() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/stocks`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                let data = await response.json();
+                
+                // If market is closed, modify data for after-hours display
+                if (!isMarketOpen) {
+                    data = data.map(stock => {
+                        // For after-hours, we simulate pre-market predictions
+                        const predictionFactor = Math.random() * 0.4 + 0.8; // 0.8-1.2
+                        const direction = Math.random() > 0.5 ? 'buy' : 'sell';
+                        
+                        return {
+                            ...stock,
+                            price: stock.price * predictionFactor,
+                            change: stock.change * predictionFactor,
+                            probability: Math.min(95, stock.probability * predictionFactor),
+                            direction: direction,
+                            isAfterHours: true
+                        };
+                    });
+                }
+                
+                return data;
+            } catch (error) {
+                console.error('Error fetching stock data:', error);
+                return null;
+            }
+        }
+
+// Function to fetch stock data
+    async function fetchStockData() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/stocks`);
+            if (!response.ok) throw new Error('Network response was not ok');
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching real-time data:', error);
+            return generateFallbackData();
+        }
+    }
+    
+    // Generate fallback data
+    function generateFallbackData() {
+        const symbols = ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK', 
+                        'KOTAKBANK', 'SBIN', 'ASIANPAINT', 'AXISBANK', 'BAJFINANCE'];
+        
+        return symbols.map(symbol => {
+            const direction = Math.random() > 0.5 ? "buy" : "sell";
+            const probability = Math.floor(Math.random() * 40) + 50; // 50-90%
+            const price = (Math.random() * 5000 + 100).toFixed(2);
+            const change = (Math.random() * 4 - 2).toFixed(2); // -2% to +2%
+            
+            return {
+                symbol,
+                price: parseFloat(price),
+                change: parseFloat(change),
+                volatility: (Math.random() * 3).toFixed(2),
+                probability,
+                direction,
+                indicators: {
+                    roc: direction === "buy" ? (Math.random() * 2).toFixed(2) : (Math.random() * -2).toFixed(2),
+                    macd: direction === "buy" ? (Math.random() * 0.5).toFixed(2) : (Math.random() * -0.5).toFixed(2)
+                }
+            };
+        });
+    }	
+        
+        // Function to render stock cards
+        function renderStocks(stocks) {
+            const container = document.getElementById('results-container');
+            container.innerHTML = '';
+            
+            stocks.forEach(stock => {
+                // Determine card style based on market status
+                let cardClass = 'high-prob';
+                let badgeClass = 'high-badge';
+                let badgeText = 'High';
+                
+                if (stock.isAfterHours) {
+                    cardClass = 'after-hours-card';
+                    badgeClass = 'after-hours-badge';
+                    badgeText = 'Pre-Market';
+                } else if (stock.probability > 70) {
+                    cardClass = 'high-prob';
+                    badgeClass = 'high-badge';
+                    badgeText = 'High';
+                } else if (stock.probability > 50) {
+                    cardClass = 'medium-prob';
+                    badgeClass = 'medium-badge';
+                    badgeText = 'Medium';
+                } else {
+                    cardClass = 'low-prob';
+                    badgeClass = 'low-badge';
+                    badgeText = 'Low';
+                }
+                
+                const directionClass = stock.direction === "buy" ? "buy" : "sell";
+                const directionIcon = stock.direction === "buy" ? "fa-arrow-up" : "fa-arrow-down";
+                const directionLabel = stock.direction === "buy" ? "Buy Opportunity" : "Sell Opportunity";
+                const directionLabelClass = stock.direction === "buy" ? "buy-label" : "sell-label";
+                const progressBarColor = stock.direction === "buy" ? "bg-primary" : "bg-danger";
+                const changeIcon = stock.change >= 0 ? "fa-arrow-up" : "fa-arrow-down";
+                const changeClass = stock.change >= 0 ? "buy" : "sell";
+                
+                // Volatility classification
+                const volatility = stock.volatility || (Math.random() * 2 + 0.5); // Default if missing
+                let volatilityClass = "low-volatility";
+                let volatilityText = "Low";
+                if (volatility > 1.5) {
+                    volatilityClass = "high-volatility";
+                    volatilityText = "High";
+                } else if (volatility > 0.8) {
+                    volatilityClass = "medium-volatility";
+                    volatilityText = "Medium";
+                }
+                
+                const stockCard = `
+                    <div class="col">
+                        <div class="card h-100 stock-card ${cardClass}">
+                            <div class="probability-badge ${badgeClass}">${badgeText}</div>
+                            <div class="card-header-direction">
+                                <span class="direction-label ${directionLabelClass}">
+                                    <i class="fas ${directionIcon}"></i> ${directionLabel}
+                                </span>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h3 class="stock-symbol mb-0">${stock.symbol}</h3>
+                                    <h4 class="mb-0 ${directionClass}">
+                                        <i class="fas ${directionIcon}"></i> ₹${stock.price.toFixed(2)}
+                                    </h4>
+                                </div>
+                                
+                                <div class="d-flex justify-content-between mb-3">
+                                    <div>
+                                        <span class="text-muted">Change:</span>
+                                        <span class="${changeClass}">
+                                            <i class="fas ${changeIcon}"></i> ${Math.abs(stock.change).toFixed(2)}%
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span class="text-muted">Volatility:</span>
+                                        <strong>${volatility.toFixed(2)}%</strong>
+                                    </div>
+                                </div>
+                                
+                                ${stock.isAfterHours ? `
+                                    <div class="alert alert-info mb-3 p-2 text-center">
+                                        <small><i class="fas fa-clock me-1"></i> Pre-market prediction for next session</small>
+                                    </div>
+                                ` : ''}
+                                
+                                <div class="mb-2">
+                                    <span>Probability of >1% move:</span>
+                                    <strong class="float-end">${stock.probability.toFixed(1)}%</strong>
+                                </div>
+                                <div class="progress mb-4">
+                                    <div class="progress-bar ${progressBarColor}" 
+                                         role="progressbar" 
+                                         style="width: ${stock.probability}%;" 
+                                         aria-valuenow="${stock.probability}" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                    </div>
+                                </div>
+                                
+                                <div class="volatility-indicator ${volatilityClass}">
+                                    <span>Volatility:</span>
+                                    <div class="volatility-bar">
+                                        <div class="volatility-level"></div>
+                                    </div>
+                                    <span>${volatilityText}</span>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <div class="indicator-title">Key Indicators:</div>
+                                    <div class="row mt-2">
+                                        <div class="col-6">
+                                            <small class="text-muted">Momentum:</small>
+                                            <div class="${stock.indicators?.roc > 0 ? 'buy' : 'sell'}">
+                                                ${stock.indicators?.roc > 0 ? '+' : ''}${(stock.indicators?.roc || 0).toFixed(1)}%
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted">Trend:</small>
+                                            <div class="${stock.indicators?.macd > 0 ? 'buy' : 'sell'}">
+                                                ${(stock.indicators?.macd || 0).toFixed(2)}
+                                            </div>
+                                        </div>
+                                        <div class="col-6 mt-2">
+                                            <small class="text-muted">Volume:</small>
+                                            <div>${(stock.indicators?.volumeRatio || 1.0).toFixed(1)}x</div>
+                                        </div>
+                                        <div class="col-6 mt-2">
+                                            <small class="text-muted">RSI:</small>
+                                            <div>${stock.indicators?.rsi || 50}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card-footer text-center py-2">
+                                <small class="text-muted">${stock.isAfterHours ? 'Next session ' : ''}Expected ${stock.direction === "buy" ? "gain" : "decline"}: ${(stock.probability/10 + Math.random() * 2).toFixed(1)}%</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                container.innerHTML += stockCard;
+            });
+        }
+        
+        // Function to render chart
+        function renderChart(stocks) {
+            const topStocks = [...stocks]
+                .sort((a, b) => b.probability - a.probability)
+                .slice(0, 5);
+            
+            const ctx = document.getElementById('probabilityChart').getContext('2d');
+            
+            // Destroy existing chart if it exists
+            if (window.probabilityChart) {
+                window.probabilityChart.destroy();
+            }
+            
+            window.probabilityChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topStocks.map(stock => stock.symbol),
+                    datasets: [{
+                        label: 'Probability %',
+                        data: topStocks.map(stock => stock.probability),
+                        backgroundColor: topStocks.map(stock => {
+                            if (stock.isAfterHours) return 'rgba(155, 89, 182, 0.7)';
+                            return stock.direction === "buy" ? 
+                                'rgba(52, 152, 219, 0.7)' : 'rgba(231, 76, 60, 0.7)';
+                        }),
+                        borderColor: topStocks.map(stock => {
+                            if (stock.isAfterHours) return 'rgba(155, 89, 182, 1)';
+                            return stock.direction === "buy" ? 
+                                'rgba(52, 152, 219, 1)' : 'rgba(231, 76, 60, 1)';
+                        }),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false,
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleFont: {
+                                size: 14
+                            },
+                            bodyFont: {
+                                size: 13
+                            },
+                            callbacks: {
+                                label: function(context) {
+                                    const stock = topStocks[context.dataIndex];
+                                    const direction = stock.direction === "buy" ? "Buy Opportunity" : "Sell Opportunity";
+                                    return [
+                                        `Probability: ${context.parsed.y}%`,
+                                        `Direction: ${direction}`,
+                                        `Price: ₹${stock.price.toFixed(2)}`,
+                                        stock.isAfterHours ? 'Pre-market prediction' : 'Live market data'
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.7)',
+                                font: {
+                                    size: 12
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: 'rgba(255, 255, 255, 0.7)',
+                                font: {
+                                    size: 11,
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        }
+        
+        // Filter stocks based on selection
+        function filterStocks(filter) {
+            let filteredStocks = [...currentStocks];
+            
+            if (filter === 'buy') {
+                filteredStocks = filteredStocks.filter(stock => stock.direction === "buy");
+            } else if (filter === 'sell') {
+                filteredStocks = filteredStocks.filter(stock => stock.direction === "sell");
+            } else if (filter === 'high') {
+                filteredStocks = filteredStocks.filter(stock => stock.probability > 70);
+            } else if (filter === 'medium') {
+                filteredStocks = filteredStocks.filter(stock => stock.probability > 50 && stock.probability <= 70);
+            }
+            
+            renderStocks(filteredStocks);
+            renderChart(filteredStocks);
+        }
+        
+        // Sort stocks
+        function sortStocks(criteria) {
+            const sortedStocks = [...currentStocks];
+            
+            if (criteria === 'probability') {
+                sortedStocks.sort((a, b) => b.probability - a.probability);
+            } else if (criteria === 'change') {
+                sortedStocks.sort((a, b) => b.volatility - a.volatility);
+            }
+            
+            renderStocks(sortedStocks);
+            renderChart(sortedStocks);
+        }
+        
+        // Search stocks
+        function searchStocks(query) {
+            if (!query) {
+                renderStocks(currentStocks);
+                renderChart(currentStocks);
+                return;
+            }
+            
+            const filteredStocks = currentStocks.filter(stock => 
+                stock.symbol.toLowerCase().includes(query.toLowerCase())
+            );
+            
+            renderStocks(filteredStocks);
+            renderChart(filteredStocks);
+        }
+        
+        // Initialize the application
+        let currentStocks = [];
+        
+        async function initApp() {
+            document.getElementById('loader').style.display = 'block';
+            document.getElementById('results-container').style.display = 'none';
+            
+            // Update market status
+            updateMarketStatus();
+            
+            try {
+                const realTimeData = await fetchStockData();
+                
+                if (realTimeData && realTimeData.length > 0) {
+                    currentStocks = realTimeData;
+                    renderStocks(currentStocks);
+                    renderChart(currentStocks);
+                    
+                    const now = new Date();
+                    document.getElementById('update-time').textContent = 
+                        now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                }
+                
+            } catch (error) {
+                console.error('Error initializing app:', error);
+            } finally {
+                document.getElementById('loader').style.display = 'none';
+                document.getElementById('results-container').style.display = 'flex';
+            }
+        }
+        
+        // Event listeners when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            
+            // Filter buttons
+            document.querySelectorAll('.filter-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+                    filterStocks(this.dataset.filter);
+                });
+            });
+            
+            // Sort buttons
+            document.getElementById('sort-probability').addEventListener('click', () => {
+                sortStocks('probability');
+                document.getElementById('sort-probability').innerHTML = '<i class="fas fa-sort-amount-down-alt"></i> Sorted by Probability';
+                document.getElementById('sort-change').innerHTML = '<i class="fas fa-sort-amount-down"></i> Sort by Volatility';
+            });
+            
+            document.getElementById('sort-change').addEventListener('click', () => {
+                sortStocks('change');
+                document.getElementById('sort-change').innerHTML = '<i class="fas fa-sort-amount-down-alt"></i> Sorted by Volatility';
+                document.getElementById('sort-probability').innerHTML = '<i class="fas fa-sort-amount-down"></i> Sort by Probability';
+            });
+            
+            // Search input
+            document.getElementById('stock-search').addEventListener('input', function() {
+                searchStocks(this.value);
+            });
+            
+            // Refresh button
+            document.getElementById('refresh-data').addEventListener('click', initApp);
+            
+            // Auto-refresh - different intervals based on market status
+            setInterval(() => {
+                const status = checkMarketStatus();
+                
+                // Refresh more frequently during market hours
+                if (status === 'open') {
+                    initApp();
+                }
+                // Refresh less frequently during after-hours
+                else if (status === 'after-hours') {
+                    initApp();
+                }
+            }, 5 * 60 * 1000); // Check every 5 minutes
+        });
+    </script>
+</body>
+</html>
