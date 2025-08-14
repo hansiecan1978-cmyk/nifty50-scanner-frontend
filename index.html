@@ -624,7 +624,8 @@ fetch(`${API_BASE_URL}/stocks`)
                 const changeClass = stock.change >= 0 ? "buy" : "sell";
                 
                 // Volatility classification
-                const volatility = stock.volatility || (Math.random() * 2 + 0.5); // Default if missing
+
+                const volatility = typeof stock.volatility === 'number' ? stock.volatility : (Math.random() * 2 + 0.5);
                 let volatilityClass = "low-volatility";
                 let volatilityText = "Low";
                 if (volatility > 1.5) {
@@ -958,6 +959,7 @@ fetch(`${API_BASE_URL}/stocks`)
     </script>
 </body>
 </html>
+
 
 
 
