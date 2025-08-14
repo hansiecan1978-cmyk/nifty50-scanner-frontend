@@ -197,7 +197,12 @@
             background: var(--secondary);
             border-color: var(--secondary);
         }
-        
+        // Temporary debug
+console.log("Testing API connection...");
+fetch(`${API_BASE_URL}/stocks`)
+  .then(res => res.json())
+  .then(data => console.log("API Response:", data))
+  .catch(err => console.error("API Error:", err));
         .direction-indicator {
             display: inline-block;
             width: 24px;
@@ -973,4 +978,5 @@
     </script>
 </body>
 </html>
+
 
